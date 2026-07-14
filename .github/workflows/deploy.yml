@@ -116,12 +116,10 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.5"
+          terraform_version: "1.15.8"
 
       - name: Terraform init
         working-directory: ${{ env.TF_WORKING_DIR }}
-        env:
-          ARM_USE_AZUREAD: true
         run: terraform init
 
       - name: Terraform validate
@@ -134,7 +132,6 @@ jobs:
           terraform plan \
             -var="image_tag=${{ needs.build-and-push.outputs.image_tag }}" \
             -var="project_name=${{ env.PROJECT_NAME }}"
-
       - name: Terraform apply
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
