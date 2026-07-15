@@ -97,7 +97,8 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ---------------------------------------------------------------------
-Azure App Service (Linux F1)  # Job 3: Deploy/update infrastructure with Terraform, pointing ACI at
+  #Azure App Service (Linux F1)
+  # Job 3: Deploy/update infrastructure with Terraform, pointing ACI at
   # the freshly pushed image tag.
   # ---------------------------------------------------------------------
   terraform-deploy:
