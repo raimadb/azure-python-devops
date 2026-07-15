@@ -97,7 +97,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ---------------------------------------------------------------------
-  # Job 3: Deploy/update infrastructure with Terraform, pointing ACI at
+Azure App Service (Linux F1)  # Job 3: Deploy/update infrastructure with Terraform, pointing ACI at
   # the freshly pushed image tag.
   # ---------------------------------------------------------------------
   terraform-deploy:
@@ -142,3 +142,10 @@ jobs:
       - name: Show deployed FQDN
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform output aci_fqdn
+
+      - name: Restart Azure App Service
+        run: |
+          az webapp restart \
+            --resource-group azpydevops-rg \
+            --name azpydevops-webapp
+
