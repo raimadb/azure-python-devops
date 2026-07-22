@@ -19,6 +19,9 @@ name: Build, Test, and Deploy to Azure (Free Tier)
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "*.md"
   workflow_dispatch: {}
 
 env:

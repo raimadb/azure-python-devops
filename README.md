@@ -173,7 +173,8 @@ This project strengthened my understanding of:
 
 ```bash
 git clone https://github.com/raimadb/azure-python-devops.git
-cd azure-python-devops```
+cd azure-python-devops
+```
 
 ### 2. Configure GitHub Secrets
 
