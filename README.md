@@ -167,6 +167,10 @@ This project strengthened my understanding of:
 - Deploy to Azure Kubernetes Service (AKS)
 - Add monitoring using Azure Monitor and Application Insights
 
+## CI/CD Optimization
+
+The workflow is configured with `paths-ignore` to prevent deployments when only documentation (`*.md`) files are updated. This reduces unnecessary CI/CD runs while ensuring code and infrastructure changes still trigger automated testing and deployment.
+
 ## Getting Started
 
 ### 1. Clone the repository
