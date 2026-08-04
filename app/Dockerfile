@@ -33,6 +33,12 @@ WORKDIR /app
 
 # Bring in the pre-built virtual environment from the builder stage
 COPY --from=builder /opt/venv /opt/venv
+# The python:3.11-slim base image also bundles its own system-level pip/
+# setuptools/wheel (separate from the venv above). The app never uses these
+# at runtime, but Trivy scans the full filesystem, so they still need
+# patching to clear known CVEs from the image.
+RUN /usr/local/bin/python3.11 -m pip install --no-cache-dir --upgrade \
+    pip "setuptools>=78.1.1" "wheel>=0.46.2"
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application source
