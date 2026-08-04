@@ -33,12 +33,12 @@ WORKDIR /app
 
 # Bring in the pre-built virtual environment from the builder stage
 COPY --from=builder /opt/venv /opt/venv
-# The python:3.11-slim base image also bundles its own system-level pip/
-# setuptools/wheel (separate from the venv above). The app never uses these
-# at runtime, but Trivy scans the full filesystem, so they still need
-# patching to clear known CVEs from the image.
-RUN /usr/local/bin/python3.11 -m pip install --no-cache-dir --upgrade \
-    pip "setuptools>=78.1.1" "wheel>=0.46.2"
+# Build tooling (pip, setuptools, wheel) is only needed to INSTALL dependencies
+# during the build — the running app (CMD below) only ever calls uvicorn, never
+# pip. Removing build tooling from the shipped image entirely eliminates CVEs
+# in pip's own vendored sub-packages, rather than chasing them version by version.
+RUN /opt/venv/bin/python -m pip uninstall -y pip setuptools wheel && \
+    /usr/local/bin/python3.11 -m pip uninstall -y pip setuptools wheel
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application source
