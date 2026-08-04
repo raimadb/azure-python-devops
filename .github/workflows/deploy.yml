@@ -22,6 +22,11 @@ on:
     paths-ignore:
       - "README.md"
       - "*.md"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "*.md"
   workflow_dispatch: {}
 
 env:
@@ -34,11 +39,28 @@ permissions:
   contents: read
 
 jobs:
+
+  # ---------------------------------------------------------------------
+  # Job 0: Scan for leaked secrets before anything else runs.
+  # ---------------------------------------------------------------------
+  secret-scan:
+    name: Gitleaks secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   # ---------------------------------------------------------------------
   # Job 1: Run unit tests before building/deploying anything.
   # ---------------------------------------------------------------------
   test:
     name: Run pytest
+    needs: secret-scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -60,14 +82,49 @@ jobs:
       - name: Run unit tests
         working-directory: app
         run: pytest -v
+  sast:
+    name: Semgrep SAST
+    needs: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: semgrep/semgrep-action@v1
+        with:
+          config: p/python p/fastapi p/security-audit p/secrets
+
+  dependency-scan:
+    name: pip-audit dependency scan
+    needs: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pip-audit
+      - run: pip-audit -r app/requirements.txt --desc
+
+  iac-scan:
+    name: tfsec Terraform scan
+    needs: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: infra
+          soft_fail: true
 
   # ---------------------------------------------------------------------
   # Job 2: Build the Docker image and push it to Azure Container Registry.
   # ---------------------------------------------------------------------
   build-and-push:
     name: Build & push Docker image to ACR
-    needs: test
+    needs: [test, sast, dependency-scan, iac-scan]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       image_tag: ${{ steps.vars.outputs.image_tag }}
     steps:
@@ -88,7 +145,25 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Build and push image
+      - name: Build image (local only, not pushed yet)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.image_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.image_tag }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 1
+
+      - name: Push image (only if scan passed)
         uses: docker/build-push-action@v6
         with:
           context: ./app
@@ -99,14 +174,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image
+        run: |
+          cosign sign --yes \
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.image_tag }}
+
   # ---------------------------------------------------------------------
-  #Azure App Service (Linux F1)
+  # Azure App Service (Linux F1)
   # Job 3: Deploy/update infrastructure with Terraform, pointing ACI at
   # the freshly pushed image tag.
   # ---------------------------------------------------------------------
   terraform-deploy:
     name: Terraform apply (deploy to ACI)
     needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -152,4 +236,3 @@ jobs:
           az webapp restart \
             --resource-group azpydevops-rg \
             --name azpydevops-webapp
-
