@@ -22,6 +22,11 @@ on:
     paths-ignore:
       - "README.md"
       - "*.md"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "*.md"
   workflow_dispatch: {}
 
 env:
@@ -184,6 +189,7 @@ jobs:
   terraform-deploy:
     name: Terraform apply (deploy to ACI)
     needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
