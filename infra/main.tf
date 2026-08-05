@@ -30,21 +30,6 @@ terraform {
       version = "~> 3.0"
     }
   }
-
-  # ---------------------------------------------------------------------
-  # Remote state (recommended for real projects / team use).
-  # Uncomment and fill in once you've created a Storage Account + container
-  # to hold state (this itself is a free-tier-eligible Storage Account).
-  # Using remote state means CI/CD runs (GitHub Actions) and your local
-  # machine always see the same state file, avoiding drift/conflicts.
-  #
-  # backend "azurerm" {
-  #   resource_group_name  = "tfstate-rg"
-  #   storage_account_name = "tfstatestorageacct"   # must be globally unique
-  #   container_name       = "tfstate"
-  #   key                  = "azure-python-devops.tfstate"
-  # }
-  # ---------------------------------------------------------------------
 }
 
 provider "azurerm" {
@@ -93,6 +78,23 @@ resource "azurerm_container_registry" "main" {
 }
 
 # -----------------------------------------------------------------------
+# User-assigned managed identity for ACI to pull images from ACR without
+# any password/credential ever being stored or output — Azure handles
+# the authentication behind the scenes.
+# -----------------------------------------------------------------------
+resource "azurerm_user_assigned_identity" "aci_identity" {
+  name                = "${var.project_name}-identity"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+}
+
+resource "azurerm_role_assignment" "acr_pull" {
+  scope                = azurerm_container_registry.main.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_user_assigned_identity.aci_identity.principal_id
+}
+
+# -----------------------------------------------------------------------
 # 3. Azure Container Instance (ACI)
 # Runs your Docker container without needing a full VM or Kubernetes
 # cluster (no AKS = no cluster management overhead or control-plane
@@ -112,10 +114,14 @@ resource "azurerm_container_group" "main" {
   # azpydevops-app.centralindia.azurecontainer.io
   dns_name_label = "${var.project_name}-app"
 
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.aci_identity.id]
+  }
+
   image_registry_credential {
-    server   = azurerm_container_registry.main.login_server
-    username = azurerm_container_registry.main.admin_username
-    password = azurerm_container_registry.main.admin_password
+    server                     = azurerm_container_registry.main.login_server
+    user_assigned_identity_id  = azurerm_user_assigned_identity.aci_identity.id
   }
 
   container {
@@ -142,5 +148,5 @@ resource "azurerm_container_group" "main" {
 
   # The container image must already exist in ACR before Terraform can
   # start the container group, so ACR is created first.
-  depends_on = [azurerm_container_registry.main]
+  depends_on = [azurerm_container_registry.main, azurerm_role_assignment.acr_pull]
 }
