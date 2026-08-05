@@ -18,12 +18,6 @@ output "acr_admin_username" {
   value       = azurerm_container_registry.main.admin_username
 }
 
-output "acr_admin_password" {
-  description = "ACR admin password (store as REGISTRY_PASSWORD secret)."
-  value       = azurerm_container_registry.main.admin_password
-  sensitive   = true
-}
-
 output "aci_fqdn" {
   description = "Public fully-qualified domain name of the running container. Visit http://<this>:8000 and http://<this>:8000/health once deployed."
   value       = azurerm_container_group.main.fqdn
