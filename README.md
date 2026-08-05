@@ -21,31 +21,47 @@ This project demonstrates a complete DevSecOps pipeline following security-first
 ## Architecture
 
 ```text
-GitHub
-    │
-    ▼
-GitHub Actions
-    │
-    ├── Gitleaks (secret scanning)
-    ├── Semgrep (SAST)
-    ├── pip-audit (dependency/SCA scanning)
-    ├── tfsec (Terraform/IaC scanning)
-    ├── Run Unit Tests (pytest)
-    ├── Build Docker Image
-    ├── Trivy (container image scanning — blocks on CRITICAL/HIGH)
-    ├── Push Image to Azure Container Registry
-    ├── Cosign (image signing via GitHub OIDC)
-    └── Terraform Apply (via OIDC federated identity)
+GitHub (push or pull_request → main)
             │
             ▼
-Azure Container Registry
+    secret-scan (Gitleaks)
             │
-            ▼ (pull via User-Assigned Managed Identity)
-Azure Container Instance (ACI)
-
-            │
-            ▼
-Azure App Service (Linux F1)
+    ┌───────┼───────────┬──────────────┐
+    ▼       ▼            ▼              ▼
+   test    sast   dependency-scan    iac-scan
+ (pytest) (Semgrep)  (pip-audit)     (tfsec)
+    │       │            │              │
+    └───────┴────────────┴──────────────┘
+                    │
+                    ▼
+            build-and-push
+    ┌──────────────────────────────────┐
+    │ Checkout                         │
+    │ Compute image tag (Git SHA)      │
+    │ Set up Docker Buildx             │
+    │ Log in to ACR                    │
+    │ Build image (not pushed yet)     │
+    │ Trivy scan (blocks on CRIT/HIGH) │
+    │ Push image to ACR                │
+    │ Install + run Cosign (sign image)│
+    └──────────────────────────────────┘
+                    │
+                    ▼
+          terraform-deploy
+     (only if: push to main — never on PRs)
+    ┌──────────────────────────────────┐
+    │ Log in to Azure (OIDC)           │
+    │ Terraform init/validate/plan     │
+    │ Terraform apply → ACI            │
+    │ Update + restart App Service     │
+    └──────────────────────────────────┘
+                    │
+             ┌──────┴──────┐
+             ▼             ▼
+    Azure Container   Azure App Service
+    Instance (ACI)      (Linux F1)
+   (pulls via Managed  (pulls via ACR
+      Identity)          admin creds)
 ```
 
 ## Tech Stack
