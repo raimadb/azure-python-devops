@@ -160,7 +160,13 @@ Azure Container Instance
 http://azpydevops-app.centralindia.azurecontainer.io:8000/
 http://azpydevops-app.centralindia.azurecontainer.io:8000/health
 
-> Note: ACI runs on Azure's pay-as-you-go/free-credit compute and may be intentionally stopped between demos to control cost. The App Service link above is the more reliable always-on endpoint.
+> **Note:** The Azure free trial for this project's subscription has expired, so the live deployments below are currently offline. The pipeline, infrastructure code, and full CI/CD history remain fully functional and viewable — see the [Actions tab](https://github.com/raimadb/azure-python-devops/actions) for live scan/deploy logs, or clone this repo and deploy to your own Azure subscription using the steps below.
+
+Azure App Service (Linux F1)
+https://azpydevops-webapp.azurewebsites.net/
+
+Azure Container Instance
+http://azpydevops-app.centralindia.azurecontainer.io:8000/
 
 ## GitHub Secrets Required
 
